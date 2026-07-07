@@ -51,3 +51,8 @@ variable "app_http_port" {
   type        = number
   default     = 8080
 }
+
+variable "alert_email" {
+  description = "Adresse email qui recevra les alertes CloudWatch (confirmation manuelle requise apres apply)"
+  type        = string
+}

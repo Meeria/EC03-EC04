@@ -23,7 +23,91 @@ Priorite de traitement dans cette mission : les risques Critique et Eleve (1, 2,
 
 ## Configuration securite
 
-(IAM, politiques, regles reseau, gestion des secrets - a completer)
+Perimetre retenu pour cette section : IAM, reseau et secrets (infra), en coherence avec le libelle du livrable. Les corrections applicatives (authentification API, restriction CORS) restent hors perimetre de cette mission et sont documentees comme piste d'amelioration en fin de fichier.
+
+### IAM - politique de l'operateur (risque #9)
+
+Aujourd'hui, Terraform et Ansible sont lances avec les identifiants AWS personnels de l'operateur, sans politique dediee. Ce n'est pas un probleme immediat (compte personnel, exercice individuel), mais ce n'est pas non plus le principe du moindre privilege : ces identifiants ont potentiellement bien plus de droits que necessaire.
+
+Voici la politique IAM qui devrait etre attachee a un utilisateur/role de deploiement dedie :
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "InfraProvisioningEuWest3Only",
+      "Effect": "Allow",
+      "Action": ["ec2:*", "rds:*", "s3:*", "ecr:*"],
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": { "aws:RequestedRegion": "eu-west-3" }
+      }
+    },
+    {
+      "Sid": "SecretsManagerUrbanhubOnly",
+      "Effect": "Allow",
+      "Action": [
+        "secretsmanager:CreateSecret",
+        "secretsmanager:DeleteSecret",
+        "secretsmanager:PutSecretValue",
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:DescribeSecret",
+        "secretsmanager:TagResource"
+      ],
+      "Resource": "arn:aws:secretsmanager:eu-west-3:*:secret:urbanhub/*"
+    },
+    {
+      "Sid": "IamRoleForEc2InstanceOnly",
+      "Effect": "Allow",
+      "Action": [
+        "iam:CreateRole", "iam:DeleteRole", "iam:GetRole",
+        "iam:PutRolePolicy", "iam:DeleteRolePolicy", "iam:GetRolePolicy",
+        "iam:AttachRolePolicy", "iam:DetachRolePolicy",
+        "iam:CreateInstanceProfile", "iam:DeleteInstanceProfile",
+        "iam:AddRoleToInstanceProfile", "iam:RemoveRoleFromInstanceProfile",
+        "iam:GetInstanceProfile", "iam:TagRole", "iam:PassRole"
+      ],
+      "Resource": "arn:aws:iam::*:role/urbanhub-*"
+    },
+    {
+      "Sid": "SsmSessionForDeployment",
+      "Effect": "Allow",
+      "Action": [
+        "ssm:StartSession", "ssm:TerminateSession",
+        "ssm:DescribeInstanceInformation", "ssm:GetConnectionStatus"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+```
+
+Points a retenir sur cette politique :
+- une condition de region (`aws:RequestedRegion`) limite tout ce qui pourrait etre cree en dehors d'`eu-west-3` ;
+- l'acces a Secrets Manager est restreint aux secrets sous le prefixe `urbanhub/*`, pas a tous les secrets du compte ;
+- les actions IAM sont restreintes aux roles nommes `urbanhub-*` (celui de l'instance EC2), pas a la gestion IAM du compte entier ;
+- `ec2:*`, `rds:*`, `s3:*`, `ecr:*` restent larges au niveau des actions, car Terraform a besoin de creer/lire/modifier de nombreuses ressources differentes (VPC, subnets, security groups, instances, bases, depots...) et lister chaque action une par une serait long, fragile (un oubli casse le `terraform apply`), et difficile a verifier sans rejouer le deploiement plusieurs fois. Un resserrement action-par-action plus poussee se ferait normalement avec IAM Access Analyzer, qui genere une politique a partir de l'historique CloudTrail reel d'utilisation - disproportionne pour cet exercice.
+
+Cette politique n'a pas ete appliquee au compte utilise pendant l'epreuve, pour ne pas risquer de bloquer le reste du deploiement en cours de route. Elle est documentee ici comme configuration cible.
+
+### Regles reseau (risques #4, #6)
+
+Deja mises en place en EC04-1, recapitulees ici :
+
+| Security group | Regle entrante | Justification |
+|---|---|---|
+| `app` (EC2) | port 8080 depuis `0.0.0.0/0` | API a exposer publiquement |
+| `app` (EC2) | aucun port SSH | administration via SSM Session Manager uniquement |
+| `db` (RDS) | port 5432 depuis le SG `app` uniquement | la base n'est jamais accessible depuis autre chose que le backend |
+
+Le broker MQTT (risque #4) reste hors perimetre cloud (il tourne en local uniquement), donc son absence d'authentification n'est pas corrigee ici : elle n'est pas exposee au-dela du reseau Docker local de developpement. A traiter si Mosquitto devait un jour etre deploye au-dela du poste local.
+
+### Gestion des secrets (risques #3, #12)
+
+Le mot de passe RDS est genere par Terraform et stocke dans AWS Secrets Manager (voir EC04-1) : plus aucune valeur en clair dans le code ou la configuration deployee dans le cloud.
+
+Limite assumee : le code source local (`application.properties`, `application-production.properties`, `docker-compose.yml`) garde des identifiants par defaut en clair (`urbanhub`/`urbanhub`), utilises uniquement en developpement local. Le rotation automatique du secret Secrets Manager n'est pas activee (elle demanderait une fonction Lambda dediee, disproportionne pour un seul secret dans cet exercice).
 
 ## Plan de supervision
 
