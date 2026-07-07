@@ -1,0 +1,124 @@
+### UrbanHub — Ingest Measures API Tests
+### Prérequis :
+###   1. docker-compose up -d          (démarre TimescaleDB)
+###   2. ./gradlew bootRun             (démarre l'app Spring Boot)
+###   3. Les capteurs sont auto-créés au démarrage (DataInitializer)
+### Le champ "timestamp" est en epoch milliseconds (Unix time × 1000)
+
+@baseUrl = http://localhost:8080
+
+### ── Mesure de qualité d'air (SENSOR_AIR_001) ────────────────────────────────
+POST {{baseUrl}}/ingest/measures
+Content-Type: application/json
+
+{
+  "sensor_id": "SENSOR_AIR_001",
+  "type": "AIR",
+  "timestamp": "{{$timestamp}}000",
+  "location": "ZONE_CENTRE",
+  "value": 42.5,
+  "unit": "μg/m3"
+}
+
+### ── Deuxième mesure d'air (capteur différent) ───────────────────────────────
+POST {{baseUrl}}/ingest/measures
+Content-Type: application/json
+
+{
+  "sensor_id": "SENSOR_AIR_002",
+  "type": "AIR",
+  "timestamp": "{{$timestamp}}000",
+  "location": "ZONE_NORD",
+  "value": 38.1,
+  "unit": "μg/m3"
+}
+
+### ── Mesure de bruit ─────────────────────────────────────────────────────────
+POST {{baseUrl}}/ingest/measures
+Content-Type: application/json
+
+{
+  "sensor_id": "SENSOR_NOISE_001",
+  "type": "NOISE",
+  "timestamp": "{{$timestamp}}000",
+  "location": "ZONE_CENTRE",
+  "value": 65.3,
+  "unit": "dB"
+}
+
+### ── Mesure de trafic ────────────────────────────────────────────────────────
+POST {{baseUrl}}/ingest/measures
+Content-Type: application/json
+
+{
+  "sensor_id": "SENSOR_TRAFFIC_001",
+  "type": "TRAFFIC",
+  "timestamp": "{{$timestamp}}000",
+  "location": "ZONE_SUD",
+  "value": 120.0,
+  "unit": "km/h"
+}
+
+### ── Mesure météo ────────────────────────────────────────────────────────────
+POST {{baseUrl}}/ingest/measures
+Content-Type: application/json
+
+{
+  "sensor_id": "SENSOR_WEATHER_001",
+  "type": "WEATHER",
+  "timestamp": "{{$timestamp}}000",
+  "location": "ZONE_CENTRE",
+  "value": 18.5,
+  "unit": "°C"
+}
+
+### ── Test erreur : sensor_id inconnu (attend 404) ───────────────────────────
+POST {{baseUrl}}/ingest/measures
+Content-Type: application/json
+
+{
+  "sensor_id": "SENSOR_INCONNU",
+  "type": "AIR",
+  "timestamp": "{{$timestamp}}000",
+  "location": "ZONE_CENTRE",
+  "value": 10.0,
+  "unit": "μg/m3"
+}
+
+### ── Test erreur : type invalide (attend 400) ───────────────────────────────
+POST {{baseUrl}}/ingest/measures
+Content-Type: application/json
+
+{
+  "sensor_id": "SENSOR_AIR_001",
+  "type": "INVALID_TYPE",
+  "timestamp": "{{$timestamp}}000",
+  "location": "ZONE_CENTRE",
+  "value": 10.0,
+  "unit": "μg/m3"
+}
+
+### ── Test erreur : champs manquants (attend 400) ────────────────────────────
+POST {{baseUrl}}/ingest/measures
+Content-Type: application/json
+
+{
+  "sensor_id": "",
+  "type": "AIR",
+  "timestamp": "{{$timestamp}}000",
+  "value": 10.0,
+  "unit": "μg/m3"
+}
+
+### ── Test Auto-Création de Capteur ──────────────────────────────────────────
+POST {{baseUrl}}/ingest/measures
+Content-Type: application/json
+
+{
+  "sensor_id": "SENSOR_NEW_001",
+  "type": "TRAFFIC",
+  "timestamp": "{{$timestamp}}000",
+  "location": "49.1828; -0.3706",
+  "value": 150.0,
+  "unit": "km/h"
+}

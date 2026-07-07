@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+
+    <property name="LOG_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"/>
+
+    <!-- Root logger -->
+    <root level="WARN"/>
+
+    <!-- Application loggers -->
+    <logger name="caensup.eadl.urbanhub" level="INFO"/>
+
+    <!-- MQTT ingestion - only log errors and important events -->
+    <logger name="caensup.eadl.urbanhub.ingest.mqtt" level="WARN"/>
+    <logger name="org.eclipse.paho" level="WARN"/>
+
+    <!-- Hibernate SQL logging - OFF by default (set to DEBUG only for debugging) -->
+    <logger name="org.hibernate.SQL" level="OFF"/>
+    <logger name="org.hibernate.type.descriptor.sql.BasicBinder" level="OFF"/>
+
+    <!-- Spring/JPA - reduce noise -->
+    <logger name="org.springframework" level="WARN"/>
+    <logger name="org.springframework.web" level="INFO"/>
+    <logger name="org.hibernate" level="WARN"/>
+    <logger name="org.hibernate.engine.internal" level="OFF"/>
+
+    <!-- HikariCP connection pool -->
+    <logger name="com.zaxxer.hikari" level="WARN"/>
+
+    <!-- Tomcat -->
+    <logger name="org.apache.catalina" level="WARN"/>
+    <logger name="org.apache.coyote" level="WARN"/>
+
+    <springProfile name="dev">
+        <!-- In dev, enable more verbose logging for specific packages -->
+        <logger name="caensup.eadl.urbanhub" level="DEBUG"/>
+        <logger name="caensup.eadl.urbanhub.ingest.mqtt" level="INFO"/>
+    </springProfile>
+
+    <springProfile name="debug-sql">
+        <!-- Enable SQL logging only when explicitly needed -->
+        <logger name="org.hibernate.SQL" level="DEBUG"/>
+        <logger name="org.hibernate.type.descriptor.sql.BasicBinder" level="TRACE"/>
+    </springProfile>
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${LOG_PATTERN}</pattern>
+        </encoder>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+</configuration>

@@ -1,0 +1,17 @@
+@import "tailwindcss";
+
+:root {
+    --font-display: 'Barlow Condensed', sans-serif;
+    --font-body: 'Barlow', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+
+#root {
+    display: flex;
+    min-height: 100svh;
+}

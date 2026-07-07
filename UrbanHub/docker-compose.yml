@@ -1,0 +1,118 @@
+services:
+  db:
+    image: timescale/timescaledb:latest-pg17
+    container_name: urbanhub-db
+    environment:
+      POSTGRES_DB: urbanhub
+      POSTGRES_USER: urbanhub
+      POSTGRES_PASSWORD: urbanhub
+    ports:
+      - "5432:5432"
+    volumes:
+      - urbanhub-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "psql -U urbanhub -d urbanhub -c 'SELECT 1'"]
+      interval: 60s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: urbanhub-backend
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 8080 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/urbanhub
+      SPRING_DATASOURCE_USERNAME: urbanhub
+      SPRING_DATASOURCE_PASSWORD: urbanhub
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_PROFILES_ACTIVE: dev
+      MQTT_ENABLED: "true"
+      MQTT_BROKER_URL: tcp://mosquitto:1883
+      MQTT_CLIENT_ID: urbanhub-backend
+      MQTT_TOPIC: urbanhub/sensors/#
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./src:/app/src
+    depends_on:
+      db:
+        condition: service_healthy
+      mosquitto:
+        condition: service_healthy
+    command: ./gradlew bootRun --no-daemon
+
+  frontend:
+    build:
+      context: ./front
+      dockerfile: Dockerfile
+    container_name: urbanhub-frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    volumes:
+      - ./front/src:/app/src
+      - ./front/package.json:/app/package.json
+    environment:
+      VITE_API_URL: http://localhost:8080
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: urbanhub-mosquitto
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./mqtt/mosquitto.conf:/mosquitto/config/mosquitto.conf
+    healthcheck:
+      test: ["CMD", "mosquitto_sub", "-h", "localhost", "-t", "ping", "-E", "-W", "1"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  mock-sensors:
+    build:
+      context: ./mqtt/mock-sensors
+    container_name: urbanhub-mock-sensors
+    environment:
+      MQTT_BROKER: mosquitto
+      MQTT_PORT: 1883
+      PUBLISH_INTERVAL: 5
+    volumes:
+      - ./caen-locations.json:/data/caen-locations.json:ro
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+
+  sonarqube:
+    image: sonarqube:community
+    container_name: urbanhub-sonarqube
+    environment:
+      SONAR_ES_BOOTSTRAP_CHECKS_DISABLE: "true"
+    ports:
+      - "9000:9000"
+    volumes:
+      - sonarqube-data:/opt/sonarqube/data
+      - sonarqube-logs:/opt/sonarqube/logs
+      - sonarqube-extensions:/opt/sonarqube/extensions
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -f http://localhost:9000/api/system/health || exit 1",
+        ]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+
+volumes:
+  urbanhub-db-data:
+  sonarqube-data:
+  sonarqube-logs:
+  sonarqube-extensions:

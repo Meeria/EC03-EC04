@@ -1,0 +1,69 @@
+stages:
+  - build
+  - test
+  - sonar
+  - deploy
+
+variables:
+  SONAR_USER_HOME: "${CI_PROJECT_DIR}/.sonar"  # Defines the location of the analysis task cache
+  GIT_DEPTH: "0"  # Tells git to fetch all the branches of the project, required by the analysis task
+
+build:
+  stage: build
+  image: gradle:8.11
+  script:
+    - ./gradlew assemble
+  artifacts:
+    paths:
+      - build/
+  rules:
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+    - if: $CI_COMMIT_BRANCH
+
+test:
+  stage: test
+  image: gradle:8.11
+  script:
+    - ./gradlew test jacocoTestReport
+  artifacts:
+    paths:
+      - build/reports/tests/test/
+      - build/reports/jacoco/
+  rules:
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+    - if: $CI_COMMIT_BRANCH
+
+sonarcloud-check:
+  stage: sonar
+  image: gradle:8.11
+  needs:
+    - build
+    - test
+  cache:
+    key: "${CI_JOB_NAME}"
+    paths:
+      - .sonar/cache
+  script:
+    - ./gradlew sonarqube -Dsonar.token=$SONAR_TOKEN
+  rules:
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+    - if: $CI_COMMIT_BRANCH == 'main'
+
+deploy_job:
+  stage: deploy
+  image: alpine:latest
+  before_script:
+    - apk update && apk add openssh-client
+    - eval $(ssh-agent -s)
+    # On donne les bons droits au fichier créé par GitLab
+    - chmod 400 $SSH_PRIVATE_KEY
+    # On ajoute le fichier directement
+    - ssh-add $SSH_PRIVATE_KEY
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.ssh
+    - ssh-keyscan -p 7818 $SERVER_IP >> ~/.ssh/known_hosts
+  script:
+    - ssh -p 7818 $SERVER_USER@$SERVER_IP "cd /home/user/UrbanHub && git config pull.rebase false && git pull https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/ALIX-Lubin/UrbanHub.git main && docker compose build backend frontend && docker compose up -d backend frontend"
+  only:
+    - main
+
