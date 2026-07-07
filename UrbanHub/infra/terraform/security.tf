@@ -1,6 +1,6 @@
 resource "aws_security_group" "app" {
   name        = "${var.project_name}-app"
-  description = "Backend UrbanHub : uniquement le port applicatif exposé (pas de SSH — accès via SSM Session Manager)"
+  description = "Backend UrbanHub : uniquement le port applicatif expose (pas de SSH - acces via SSM Session Manager)"
   vpc_id      = aws_vpc.main.id
 
   ingress {
