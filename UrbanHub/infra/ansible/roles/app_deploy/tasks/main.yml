@@ -1,0 +1,34 @@
+- name: Recuperer le mot de passe RDS depuis Secrets Manager
+  ansible.builtin.command:
+    cmd: >
+      aws secretsmanager get-secret-value
+      --secret-id "{{ db_password_secret_id }}"
+      --query "SecretString"
+      --output text
+      --region "{{ aws_region }}"
+  delegate_to: localhost
+  become: false
+  changed_when: false
+  no_log: true
+  register: secrets_manager_db_password
+
+- name: Memoriser le mot de passe pour le template .env
+  ansible.builtin.set_fact:
+    db_password: "{{ secrets_manager_db_password.stdout }}"
+  no_log: true
+
+- name: Recuperer un jeton d'authentification ECR
+  ansible.builtin.command:
+    cmd: "aws ecr get-login-password --region {{ aws_region }}"
+  delegate_to: localhost
+  become: false
+  changed_when: false
+  no_log: true
+  register: ecr_password
+
+- name: Connexion Docker au registre ECR depuis le serveur
+  community.docker.docker_login:
+    registry_url: "{{ ecr_repository_url.split('/')[0] }}"
+    username: AWS
+    password: "{{ ecr_password.stdout }}"
+  no_log: true
