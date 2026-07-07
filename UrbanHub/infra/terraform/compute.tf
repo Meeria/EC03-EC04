@@ -63,3 +63,24 @@ resource "aws_iam_instance_profile" "ec2_ssm" {
   name = "${var.project_name}-ec2-ssm-profile"
   role = aws_iam_role.ec2_ssm.name
 }
+
+resource "aws_instance" "backend" {
+  ami                    = data.aws_ami.al2023.id
+  instance_type          = var.instance_type
+  subnet_id              = aws_subnet.public[0].id
+  vpc_security_group_ids = [aws_security_group.app.id]
+  iam_instance_profile   = aws_iam_instance_profile.ec2_ssm.name
+
+  tags = {
+    Name = "${var.project_name}-backend"
+  }
+}
+
+resource "aws_eip" "backend" {
+  instance = aws_instance.backend.id
+  domain   = "vpc"
+
+  tags = {
+    Name = "${var.project_name}-backend-eip"
+  }
+}
