@@ -29,67 +29,16 @@ Perimetre retenu pour cette section : IAM, reseau et secrets (infra), en coheren
 
 Aujourd'hui, Terraform et Ansible sont lances avec les identifiants AWS personnels de l'operateur, sans politique dediee. Ce n'est pas un probleme immediat (compte personnel, exercice individuel), mais ce n'est pas non plus le principe du moindre privilege : ces identifiants ont potentiellement bien plus de droits que necessaire.
 
-Voici la politique IAM qui devrait etre attachee a un utilisateur/role de deploiement dedie :
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Sid": "InfraProvisioningEuWest3Only",
-      "Effect": "Allow",
-      "Action": ["ec2:*", "rds:*", "s3:*", "ecr:*"],
-      "Resource": "*",
-      "Condition": {
-        "StringEquals": { "aws:RequestedRegion": "eu-west-3" }
-      }
-    },
-    {
-      "Sid": "SecretsManagerUrbanhubOnly",
-      "Effect": "Allow",
-      "Action": [
-        "secretsmanager:CreateSecret",
-        "secretsmanager:DeleteSecret",
-        "secretsmanager:PutSecretValue",
-        "secretsmanager:GetSecretValue",
-        "secretsmanager:DescribeSecret",
-        "secretsmanager:TagResource"
-      ],
-      "Resource": "arn:aws:secretsmanager:eu-west-3:*:secret:urbanhub/*"
-    },
-    {
-      "Sid": "IamRoleForEc2InstanceOnly",
-      "Effect": "Allow",
-      "Action": [
-        "iam:CreateRole", "iam:DeleteRole", "iam:GetRole",
-        "iam:PutRolePolicy", "iam:DeleteRolePolicy", "iam:GetRolePolicy",
-        "iam:AttachRolePolicy", "iam:DetachRolePolicy",
-        "iam:CreateInstanceProfile", "iam:DeleteInstanceProfile",
-        "iam:AddRoleToInstanceProfile", "iam:RemoveRoleFromInstanceProfile",
-        "iam:GetInstanceProfile", "iam:TagRole", "iam:PassRole"
-      ],
-      "Resource": "arn:aws:iam::*:role/urbanhub-*"
-    },
-    {
-      "Sid": "SsmSessionForDeployment",
-      "Effect": "Allow",
-      "Action": [
-        "ssm:StartSession", "ssm:TerminateSession",
-        "ssm:DescribeInstanceInformation", "ssm:GetConnectionStatus"
-      ],
-      "Resource": "*"
-    }
-  ]
-}
-```
+Cette politique est definie comme une vraie ressource Terraform (`infra/terraform/iam_operator.tf`, `aws_iam_policy.operator_least_privilege`) plutot que comme un simple exemple JSON dans ce document, pour rester coherente avec le reste de l'infra-as-code.
 
 Points a retenir sur cette politique :
-- une condition de region (`aws:RequestedRegion`) limite tout ce qui pourrait etre cree en dehors d'`eu-west-3` ;
-- l'acces a Secrets Manager est restreint aux secrets sous le prefixe `urbanhub/*`, pas a tous les secrets du compte ;
-- les actions IAM sont restreintes aux roles nommes `urbanhub-*` (celui de l'instance EC2), pas a la gestion IAM du compte entier ;
-- `ec2:*`, `rds:*`, `s3:*`, `ecr:*` restent larges au niveau des actions, car Terraform a besoin de creer/lire/modifier de nombreuses ressources differentes (VPC, subnets, security groups, instances, bases, depots...) et lister chaque action une par une serait long, fragile (un oubli casse le `terraform apply`), et difficile a verifier sans rejouer le deploiement plusieurs fois. Un resserrement action-par-action plus poussee se ferait normalement avec IAM Access Analyzer, qui genere une politique a partir de l'historique CloudTrail reel d'utilisation - disproportionne pour cet exercice.
+- une condition de region (`aws:RequestedRegion`) limite tout ce qui pourrait etre cree en dehors de la region du projet (`var.region`) ;
+- l'acces a Secrets Manager est restreint aux secrets sous le prefixe `<project_name>/*`, pas a tous les secrets du compte ;
+- les actions IAM sont restreintes aux roles nommes `<project_name>-*` (celui de l'instance EC2), pas a la gestion IAM du compte entier ;
+- un statement `logs:*` scope au log group `/<project_name>/*` a ete ajoute pour couvrir la gestion du log group CloudWatch (`monitoring.tf`), absent de la version precedente de cette politique (elle aurait bloque sur ce point si elle avait ete appliquee telle quelle) ;
+- `ec2:*`, `rds:*`, `s3:*`, `ecr:*` restent larges au niveau des actions, car Terraform a besoin de creer/lire/modifier de nombreuses ressources differentes (VPC, subnets, security groups, instances, bases, depots...) et lister chaque action une par une serait long, fragile (un oubli casse le `terraform apply`), et difficile a verifier sans rejouer le deploiement plusieurs fois. Un resserrement action-par-action plus pousse se ferait normalement avec IAM Access Analyzer, qui genere une politique a partir de l'historique CloudTrail reel d'utilisation - disproportionne pour cet exercice.
 
-Cette politique n'a pas ete appliquee au compte utilise pendant l'epreuve, pour ne pas risquer de bloquer le reste du deploiement en cours de route. Elle est documentee ici comme configuration cible.
+Cette policy n'est **pas attachee** a un utilisateur ou groupe IAM. La creer ne change rien aux droits actuels de l'operateur (une policy non attachee est inerte) ; l'attacher en complement d'un acces deja large ne changerait rien non plus (les permissions IAM s'additionnent). Seul le fait de retirer l'acces large actuel pour ne garder que celle-ci constituerait une application reelle du moindre privilege - ce qui n'a pas ete fait ici, pour ne pas risquer de bloquer le reste du deploiement si un droit venait a manquer en plein epreuve. Elle reste donc une configuration prete a etre activee (`aws_iam_user_policy_attachment` en une ligne), documentee comme cible plutot qu'appliquee.
 
 ### Regles reseau (risques #4, #6)
 

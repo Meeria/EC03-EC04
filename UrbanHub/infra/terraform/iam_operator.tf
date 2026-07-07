@@ -1,0 +1,66 @@
+resource "aws_iam_policy" "operator_least_privilege" {
+  name        = "${var.project_name}-operator-least-privilege"
+  description = "Politique cible pour l'operateur Terraform/Ansible (principe du moindre privilege). Non attachee a un utilisateur : voir docs/EC04-2-securite.md."
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid       = "InfraProvisioningRegionOnly"
+        Effect    = "Allow"
+        Action    = ["ec2:*", "rds:*", "s3:*", "ecr:*"]
+        Resource  = "*"
+        Condition = {
+          StringEquals = { "aws:RequestedRegion" = var.region }
+        }
+      },
+      {
+        Sid      = "SecretsManagerUrbanhubOnly"
+        Effect   = "Allow"
+        Action   = [
+          "secretsmanager:CreateSecret",
+          "secretsmanager:DeleteSecret",
+          "secretsmanager:PutSecretValue",
+          "secretsmanager:GetSecretValue",
+          "secretsmanager:DescribeSecret",
+          "secretsmanager:TagResource"
+        ]
+        Resource = "arn:aws:secretsmanager:${var.region}:*:secret:${var.project_name}/*"
+      },
+      {
+        Sid      = "IamRoleForEc2InstanceOnly"
+        Effect   = "Allow"
+        Action   = [
+          "iam:CreateRole", "iam:DeleteRole", "iam:GetRole",
+          "iam:PutRolePolicy", "iam:DeleteRolePolicy", "iam:GetRolePolicy",
+          "iam:AttachRolePolicy", "iam:DetachRolePolicy",
+          "iam:CreateInstanceProfile", "iam:DeleteInstanceProfile",
+          "iam:AddRoleToInstanceProfile", "iam:RemoveRoleFromInstanceProfile",
+          "iam:GetInstanceProfile", "iam:TagRole", "iam:PassRole"
+        ]
+        Resource = "arn:aws:iam::*:role/${var.project_name}-*"
+      },
+      {
+        Sid      = "CloudWatchLogsForBackend"
+        Effect   = "Allow"
+        Action   = [
+          "logs:CreateLogGroup",
+          "logs:DeleteLogGroup",
+          "logs:DescribeLogGroups",
+          "logs:PutRetentionPolicy",
+          "logs:TagResource"
+        ]
+        Resource = "arn:aws:logs:${var.region}:*:log-group:/${var.project_name}/*"
+      },
+      {
+        Sid      = "SsmSessionForDeployment"
+        Effect   = "Allow"
+        Action   = [
+          "ssm:StartSession", "ssm:TerminateSession",
+          "ssm:DescribeInstanceInformation", "ssm:GetConnectionStatus"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
