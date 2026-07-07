@@ -109,6 +109,8 @@ Le mot de passe RDS est genere par Terraform et stocke dans AWS Secrets Manager 
 
 Limite assumee : le code source local (`application.properties`, `application-production.properties`, `docker-compose.yml`) garde des identifiants par defaut en clair (`urbanhub`/`urbanhub`), utilises uniquement en developpement local. Le rotation automatique du secret Secrets Manager n'est pas activee (elle demanderait une fonction Lambda dediee, disproportionne pour un seul secret dans cet exercice).
 
+Le stockage RDS est chiffre au repos (`storage_encrypted = true` dans `database.tf`, chiffrement gere par AWS KMS avec la cle par defaut). Ce parametre ne peut pas etre ajoute a une instance existante sans remplacement (Terraform detruit et recree l'instance) : applique ici en acceptant la recreation de la base pendant l'epreuve.
+
 ## Plan de supervision
 
 (logs, metriques, alertes - a completer)
