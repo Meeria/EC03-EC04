@@ -32,3 +32,27 @@
     username: AWS
     password: "{{ ecr_password.stdout }}"
   no_log: true
+
+- name: Creer le repertoire de deploiement
+  ansible.builtin.file:
+    path: /opt/urbanhub
+    state: directory
+    mode: "0755"
+
+- name: Deployer le fichier .env (secrets)
+  ansible.builtin.template:
+    src: env.j2
+    dest: /opt/urbanhub/.env
+    mode: "0600"
+  no_log: true
+
+- name: Deployer le docker-compose.yml de production
+  ansible.builtin.template:
+    src: docker-compose.prod.yml.j2
+    dest: /opt/urbanhub/docker-compose.yml
+    mode: "0644"
+
+- name: Demarrer le backend (docker compose up -d)
+  ansible.builtin.command:
+    cmd: docker compose up -d
+    chdir: /opt/urbanhub
