@@ -52,6 +52,8 @@ Deja mises en place en EC04-1, recapitulees ici :
 
 Le broker MQTT (risque #4) reste hors perimetre cloud (il tourne en local uniquement), donc son absence d'authentification n'est pas corrigee ici : elle n'est pas exposee au-dela du reseau Docker local de developpement. A traiter si Mosquitto devait un jour etre deploye au-dela du poste local.
 
+La connexion JDBC entre le backend et la RDS utilise `sslmode=require` (`env.j2`, cote Ansible) : les echanges sont chiffres en transit, meme si le SG restreint deja l'acces au seul backend. `require` chiffre sans valider le certificat serveur (pas de `verify-full`) - suffisant contre une ecoute passive du reseau AWS, evite d'avoir a embarquer et maintenir le bundle de certificats CA RDS pour une verification complete, disproportionne ici. En local (docker-compose), la base ne supporte pas SSL par defaut et n'est pas exposee au-dela du reseau Docker de developpement : le JDBC local reste donc sans `sslmode`, ce n'est pas un oubli.
+
 ### Gestion des secrets (risques #3, #12)
 
 Le mot de passe RDS est genere par Terraform et stocke dans AWS Secrets Manager (voir EC04-1) : plus aucune valeur en clair dans le code ou la configuration deployee dans le cloud.
