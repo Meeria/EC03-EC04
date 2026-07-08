@@ -110,3 +110,4 @@ jobs:
       - name: Deploy via Ansible
         working-directory: UrbanHub/infra/ansible
         run: ansible-playbook playbook.yml --extra-vars "image_tag=${{ github.sha }}"
+
