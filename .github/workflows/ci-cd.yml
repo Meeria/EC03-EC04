@@ -56,10 +56,44 @@ jobs:
         run: echo "Quality gate ok (mock)"
 
 
+# scan de vulnerabilites (dependances + filesystem) avec Trivy
+  security:
+    runs-on: ubuntu-latest
+    needs: test
+    permissions:
+      contents: read
+      security-events: write # requis pour publier le SARIF dans l'onglet Security
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Trivy (rapport complet, non bloquant)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: "."
+          format: sarif
+          output: trivy-results.sarif
+          severity: "CRITICAL,HIGH"
+          exit-code: "0"
+
+      - uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-results.sarif
+          category: trivy-fs
+
+      - name: Trivy (gate bloquant sur CRITICAL)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: "."
+          severity: "CRITICAL"
+          exit-code: "1"
+
 # build l'image et la pousse sur ECR
   docker:
     runs-on: ubuntu-latest
-    needs: quality
+    needs: [quality, security]
     if: github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v4

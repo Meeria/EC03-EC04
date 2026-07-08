@@ -8,7 +8,7 @@ Le depot a bascule de GitLab vers GitHub. Le pipeline est donc un workflow GitHu
 
 | Evenement | Jobs |
 |---|---|
-| push / pull_request, toute branche | build, test, quality |
+| push / pull_request, toute branche | build, test, quality, security |
 | push sur main | + docker (build/push ECR), deploy (Ansible vers l'EC2) |
 
 ## Etapes
@@ -16,7 +16,8 @@ Le depot a bascule de GitLab vers GitHub. Le pipeline est donc un workflow GitHu
 - **build** : `./gradlew assemble` - verifie que le projet compile de maniere reproductible.
 - **test** : `./gradlew test jacocoTestReport` sur H2 en memoire, rapport Jacoco publie en artifact (`jacoco-report`).
 - **quality** : placeholder (`echo "Quality gate ok (mock)"`). Une analyse SonarQube reelle (conteneur `sonarqube:community` ephemere en service du job, generation d'un token, verification du quality gate via l'API) a ete implementee puis remplacee par ce mock. **Limite assumee** : l'instance SonarQube initialement prevue tournait sur les serveurs de l'ecole, qui a ete arretee - plutot que de dependre d'une instance externe non garantie disponible pendant l'epreuve, le choix a ete de simuler le resultat du quality gate.
-- **docker** (main uniquement) : build de l'image depuis le `Dockerfile` existant, tag = SHA du commit (tracabilite), login ECR via `aws-actions/amazon-ecr-login`, push vers l'ECR existant (`ecr.tf`, scan de vulnerabilites deja actif via `scan_on_push`).
+- **security** : scan de vulnerabilites avec Trivy (`scan-type: fs`, code source + dependances, pas l'image Docker). Deux passages : un rapport complet (CRITICAL+HIGH, non bloquant) publie en SARIF dans l'onglet Security du repo GitHub, puis un scan bloquant (`exit-code: 1`) restreint aux CRITICAL - c'est ce second passage qui fait echouer le job.
+- **docker** (main uniquement, `needs: [quality, security]`) : build de l'image depuis le `Dockerfile` existant, tag = SHA du commit (tracabilite), login ECR via `aws-actions/amazon-ecr-login`, push vers l'ECR existant (`ecr.tf`, scan de vulnerabilites deja actif via `scan_on_push`). Une vulnerabilite CRITICAL detectee par `security` bloque ce job, et donc `deploy`.
 - **deploy** (main uniquement) : redemarrage du backend sur l'EC2 via Ansible, connexion SSM (pas de SSH). Le job installe le `session-manager-plugin` et Ansible sur le runner, genere `inventory.ini` a partir du template (`inventory.ini.tmpl`) en y injectant les repository variables `INSTANCE_ID`/`SSM_TRANSFER_BUCKET`, puis lance `ansible-playbook playbook.yml --extra-vars "image_tag=<SHA du commit>"` - l'image deployee est donc toujours celle qui vient d'etre poussee sur ECR par le job precedent.
 
 ## Prerequis (secrets/variables GitHub)
@@ -51,4 +52,5 @@ Lors du premier passage du job `deploy` sur `main`, le job a echoue avec un time
 
 - Rapport de tests : artifact `jacoco-report` sur chaque run.
 - Rapport qualite : mock actuellement (`quality` renvoie toujours un succes) - pas de rapport reel a interpreter tant que le placeholder est en place. **Limite assumee** : l'instance SonarQube prevue (serveurs de l'ecole) a ete arretee, d'ou ce remplacement par une simulation plutot qu'une dependance a une instance externe non garantie disponible pendant l'epreuve.
+- Rapport securite : reel, genere par Trivy sur chaque run (`security`). Le detail (CVE, package concerne, severite) est consultable dans l'onglet **Security > Code scanning** du repo GitHub (format SARIF, categorie `trivy-fs`) - pas seulement un statut succes/echec comme pour `quality`. Une CRITICAL fait echouer le job (et bloque `docker`/`deploy`), une HIGH remonte dans le rapport sans bloquer.
 - Tracabilite : chaque image deployee est identifiable par le SHA du commit qui l'a produite (tag ECR, et `image_tag` passe au playbook Ansible).
