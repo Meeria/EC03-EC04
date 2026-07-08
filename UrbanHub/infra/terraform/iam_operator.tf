@@ -39,7 +39,10 @@ resource "aws_iam_policy" "operator_least_privilege" {
           "iam:AddRoleToInstanceProfile", "iam:RemoveRoleFromInstanceProfile",
           "iam:GetInstanceProfile", "iam:TagRole", "iam:PassRole"
         ]
-        Resource = "arn:aws:iam::*:role/${var.project_name}-*"
+        Resource = [
+          "arn:aws:iam::*:role/${var.project_name}-*",
+          "arn:aws:iam::*:instance-profile/${var.project_name}-*"
+        ]
       },
       {
         Sid      = "IamPolicyForOperatorOnly"
