@@ -60,7 +60,7 @@ cd infra/ansible
 cp inventory.ini.tmpl inventory.ini
 ```
 
-Dans `inventory.ini`, remplacer `<INSTANCE_ID>` par `backend_instance_id` et `<SSM_TRANSFER_BUCKET>` par `ssm_transfer_bucket`. Dans `playbook.yml`, remplacer les 3 `CHANGE_ME` par `ecr_repository_url`, `db_password_secret_arn` et `rds_endpoint`.
+Dans `inventory.ini`, remplacer `<INSTANCE_ID>` par `backend_instance_id` et `<SSM_TRANSFER_BUCKET>` par `ssm_transfer_bucket`. `playbook.yml` contient deja les valeurs (`ecr_repository_url`, `db_password_secret_id`, `rds_endpoint`) pour cet environnement - a mettre a jour uniquement si l'infra est recreee (ces valeurs changeraient).
 
 ```bash
 ansible-playbook playbook.yml
@@ -88,6 +88,10 @@ sudo docker logs -f urbanhub-backend-1
 
 ## Redeploiement
 
+Automatise par le pipeline CI/CD a chaque push sur `main` (jobs `docker` + `deploy`, cf. `docs/EC03-1-cicd.md`) : build/push de l'image taguee au SHA du commit, puis deploiement Ansible via SSM.
+
+Procedure manuelle (fallback, ou pour un environnement sans CI) :
+
 ```bash
 docker build --platform linux/amd64 -t <ecr_repository_url>:latest .
 docker push <ecr_repository_url>:latest
@@ -101,5 +105,5 @@ La RDS a une protection contre la suppression accidentelle, a desactiver avant l
 ```bash
 aws rds modify-db-instance --db-instance-identifier urbanhub-exam --no-deletion-protection --apply-immediately
 cd infra/terraform
-terraform destroy
+terraform destroy 
 ```

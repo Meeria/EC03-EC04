@@ -24,6 +24,15 @@ Le depot a bascule de GitLab vers GitHub. Le pipeline est donc un workflow GitHu
 - Secrets : `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`.
 - Variables (Settings > Secrets and variables > Actions > onglet Variables) : `INSTANCE_ID`, `SSM_TRANSFER_BUCKET` (sorties Terraform `backend_instance_id` et `ssm_transfer_bucket`, stables tant que l'infra n'est pas recreee).
 
+## Perimetre : la CI ne gere pas Terraform
+
+Le pipeline automatise build, test, quality, la production de l'image Docker et son deploiement sur l'EC2 existante - il ne provisionne pas l'infrastructure elle-meme (`terraform apply` reste une commande manuelle, cf. `infra/README.md`).
+
+**Choix assume**, pas un oubli :
+- Le sujet autorise explicitement un deploiement "automatise **ou semi-automatise**" (EC04-1) et d'automatiser "**tout ou partie** du processus de deploiement" (EC03-1) - le provisioning manuel de l'infra et le deploiement applicatif automatise entrent dans ce cadre.
+- Le state Terraform est local (pas de backend S3 distant, cf. `EC04-1-architecture.md`) : sans backend distant, un job CI n'a de toute facon pas acces a l'etat actuel de l'infra pour savoir ce qui devrait changer.
+- Meme avec un backend distant, lancer `terraform apply` automatiquement en CI sur une infra de prod (RDS avec `deletion_protection`, changements pouvant impliquer un remplacement de ressource) sans etape de revue humaine serait un risque disproportionne par rapport au besoin, et irait a l'encontre de la "maitrise de la complexite" demandee pour une equipe avec des competences DevOps limitees (EC04-1, point 4).
+
 ## Incident rencontre en validant le job `deploy`
 
 Lors du premier passage du job `deploy` sur `main`, le job a echoue avec un timeout Ansible pendant la connexion SSM (`DISABLE ECHO command 'stty -echo' timeout on host`).
