@@ -64,3 +64,16 @@ resource "aws_iam_policy" "operator_least_privilege" {
     ]
   })
 }
+
+resource "aws_iam_user" "operator" {
+  name = "${var.project_name}-operator"
+}
+
+resource "aws_iam_user_policy_attachment" "operator" {
+  user       = aws_iam_user.operator.name
+  policy_arn = aws_iam_policy.operator_least_privilege.arn
+}
+
+resource "aws_iam_access_key" "operator" {
+  user = aws_iam_user.operator.name
+}

@@ -27,3 +27,14 @@ output "db_password_secret_arn" {
   description = "ARN du secret Secrets Manager contenant le mot de passe RDS — à lire avec `aws secretsmanager get-secret-value`"
   value       = aws_secretsmanager_secret.db_password.arn
 }
+
+output "operator_access_key_id" {
+  description = "Access key ID de l'utilisateur IAM least-privilege (à utiliser à la place du compte root)"
+  value       = aws_iam_access_key.operator.id
+}
+
+output "operator_secret_access_key" {
+  description = "Secret access key de l'utilisateur IAM least-privilege"
+  value       = aws_iam_access_key.operator.secret
+  sensitive   = true
+}
