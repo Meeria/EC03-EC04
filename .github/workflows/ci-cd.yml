@@ -84,3 +84,26 @@ jobs:
           echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
       - name: Run SonarQube analysis
         run: ./gradlew sonarqube -Dsonar.host.url=http://localhost:9000 -Dsonar.token=${{ steps.sonar_token.outputs.token }} --no-daemon
+      - name: Check quality gate
+        run: |
+          TASK_FILE=$(find .scannerwork -name report-task.txt | head -n1)
+          CE_TASK_URL=$(grep '^ceTaskUrl=' "$TASK_FILE" | cut -d= -f2-)
+          for i in $(seq 1 20); do
+            CE_STATUS=$(curl -s -u "${{ steps.sonar_token.outputs.token }}:" "$CE_TASK_URL" | python3 -c "import sys, json; print(json.load(sys.stdin)['task']['status'])")
+            if [ "$CE_STATUS" = "SUCCESS" ]; then break; fi
+            if [ "$CE_STATUS" = "FAILED" ] || [ "$CE_STATUS" = "CANCELED" ]; then echo "Analysis processing failed: $CE_STATUS" >&2; exit 1; fi
+            echo "Waiting for analysis to be processed... ($i/20)"
+            sleep 5
+          done
+          ANALYSIS_ID=$(curl -s -u "${{ steps.sonar_token.outputs.token }}:" "$CE_TASK_URL" | python3 -c "import sys, json; print(json.load(sys.stdin)['task']['analysisId'])")
+          curl -s -u "${{ steps.sonar_token.outputs.token }}:" "http://localhost:9000/api/qualitygates/project_status?analysisId=$ANALYSIS_ID" -o quality-gate-status.json
+          cat quality-gate-status.json
+          GATE_STATUS=$(python3 -c "import json; print(json.load(open('quality-gate-status.json'))['projectStatus']['status'])")
+          echo "Quality gate status: $GATE_STATUS"
+          if [ "$GATE_STATUS" != "OK" ]; then echo "Quality gate failed" >&2; exit 1; fi
+      - name: Upload quality gate report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sonarqube-quality-gate
+          path: UrbanHub/quality-gate-status.json
