@@ -8,8 +8,8 @@ Le depot a bascule de GitLab vers GitHub. Le pipeline est donc un workflow GitHu
 
 | Evenement | Jobs |
 |---|---|
-| push / pull_request, toute branche | build, test, quality, security |
-| push sur main | + docker (build/push ECR), deploy (Ansible vers l'EC2) |
+| pull_request vers main (ouverture, mise a jour, passage "Ready for review") | build, test, quality, security |
+| push sur main | build, test, quality, security + docker (build/push ECR), deploy (Ansible vers l'EC2) |
 
 ## Etapes
 

@@ -2,9 +2,9 @@ name: CI/CD
 
 on:
   push:
-    branches: ["**"]
+    branches: ["main"]
   pull_request:
-    branches: ["**"]
+    branches: ["main"]
     types: [opened, synchronize, reopened, ready_for_review]
 
 # build le projet java avec gradle
