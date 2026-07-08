@@ -63,13 +63,17 @@ jobs:
         run: docker run -d --name sonarqube -p 9000:9000 sonarqube:community
       - name: Wait for SonarQube to be ready
         run: |
-          for i in $(seq 1 30); do
+          for i in $(seq 1 60); do
             status=$(curl -s http://localhost:9000/api/system/health | grep -o '"health":"GREEN"' || true)
             if [ -n "$status" ]; then echo "SonarQube ready"; exit 0; fi
-            echo "Waiting for SonarQube... ($i/30)"
+            echo "Waiting for SonarQube... ($i/60)"
             sleep 5
           done
           echo "SonarQube did not become ready in time" >&2
+          echo "--- docker ps -a ---"
+          docker ps -a
+          echo "--- docker logs sonarqube (last 200 lines) ---"
+          docker logs --tail 200 sonarqube
           exit 1
       - name: Generate a one-shot analysis token
         id: sonar_token
